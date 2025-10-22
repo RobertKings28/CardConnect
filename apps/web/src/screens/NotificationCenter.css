@@ -1,0 +1,86 @@
+
+
+.notification-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.gmail-list {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background: white;
+}
+
+.gmail-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid #eee;
+    transition: background 0.2s;
+}
+
+.gmail-item:hover {
+    background: #f5f5f5;
+    cursor: pointer;
+}
+
+.gmail-checkbox {
+    margin-right: 12px;
+}
+
+.gmail-content h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.gmail-content p {
+    margin: 4px 0 0;
+    color: #555;
+    font-size: 14px;
+}
+
+.gmail-time {
+    margin-left: auto;
+    color: #777;
+    font-size: 13px;
+}
+
+/* Popup styling */
+.popup-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+}
+
+.popup-content {
+    background: white;
+    padding: 24px;
+    border-radius: 10px;
+    width: 500px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+.popup-content input,
+.popup-content textarea {
+    width: 100%;
+    margin-bottom: 12px;
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+}
+
+.popup-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}

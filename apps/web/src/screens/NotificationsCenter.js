@@ -1,73 +1,84 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
-import Navbar from '../components/Navbar/Navbar';
-import SideNav from '../components/SideNav/SideNav';
-import '../App.css';
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+import { useNavigate } from "react-router-dom";
+import Navbar from "../components/Navbar/Navbar";
+import SideNav from "../components/SideNav/SideNav";
+import "../App.css";
 
 const NotificationCenter = ({ isSideNavActive, toggleSideNav, closeSideNav }) => {
-    const [subject, setSubject] = useState('');
-    const [content, setContent] = useState('');
-    const [recipientType, setRecipientType] = useState('all_students');
-    const [specificEmails, setSpecificEmails] = useState('');
-    const [specificCourse, setSpecificCourse] = useState('');
-    const [specificDepartment, setSpecificDepartment] = useState('');
+    const [title, setTitle] = useState("");
+    const [message, setMessage] = useState("");
+    const [recipient, setRecipient] = useState("");
+    const [sendToAll, setSendToAll] = useState(false);
+    const [type, setType] = useState("INFO");
     const [notifications, setNotifications] = useState([]);
     const [error, setError] = useState(null);
-    const userId = localStorage.getItem('userId');
-    const userRole = localStorage.getItem('role');
     const navigate = useNavigate();
+    const [user, setUser] = useState(null);
+
+    const BASE_URL = "http://localhost:9090/api/notifications";
 
     useEffect(() => {
-        if (!userId) {
-            navigate('/login');
+        const storedUser = localStorage.getItem("user");
+        const token = localStorage.getItem("token"); // JWT token
+        if (!storedUser || !token) {
+            navigate("/login");
             return;
         }
 
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
+
         const fetchNotifications = async () => {
             try {
-                let response;
-                if (userRole === 'ADMIN') {
-                    response = await axios.get('http://localhost:8080/api/notifications/admin');
-                } else {
-                    response = await axios.get(`http://localhost:8080/api/notifications/user/${userId}`);
-                }
+                const response = await axios.get(`${BASE_URL}/getAll`);
                 setNotifications(response.data);
             } catch (err) {
-                setError('Failed to fetch notifications');
-                console.error(err);
+                console.error("Error fetching notifications:", err);
+                setError("Failed to fetch notifications");
             }
         };
 
         fetchNotifications();
-    }, [userId, userRole, navigate]);
+    }, [navigate]);
+
+    if (!user) {
+        return <p>Loading user...</p>;
+    }
+
+    const userRole = user.role || "ROLE_ADMIN";
 
     const handleSend = async () => {
-        if (userRole !== 'ADMIN') {
-            setError('Only admins can send notifications');
+        if (!title || !message || (!recipient && !sendToAll)) {
+            setError("Please fill in all fields.");
             return;
         }
 
         try {
+            const token = localStorage.getItem("token");
             const notification = {
-                subject,
-                content,
-                recipientType,
-                specificEmails: recipientType === 'specific_person' ? specificEmails : '',
-                specificCourse: recipientType === 'specific_course' ? specificCourse : '',
-                specificDepartment: recipientType === 'specific_department' ? specificDepartment : '',
+                title,
+                message,
+                recipient: sendToAll ? "ALL" : recipient,
+                sender: user.username || user.email || "admin",
+                type,
+                time: new Date().toLocaleString(),
             };
-            const response = await axios.post('http://localhost:8080/api/notifications', notification);
-            setNotifications([response.data, ...notifications]);
-            setSubject('');
-            setContent('');
-            setSpecificEmails('');
-            setSpecificCourse('');
-            setSpecificDepartment('');
+
+            const response = await axios.post(`${BASE_URL}/create`, notification);
+
+            // If "ALL", backend returns nothing, so we skip updating state
+            if (response.data) setNotifications([response.data, ...notifications]);
+
+            setTitle("");
+            setMessage("");
+            setRecipient("");
+            setSendToAll(false);
+            setType("INFO");
             setError(null);
         } catch (err) {
-            setError('Failed to send notification');
-            console.error(err);
+            console.error("Error sending notification:", err);
+            setError("Failed to send notification");
         }
     };
 
@@ -75,69 +86,96 @@ const NotificationCenter = ({ isSideNavActive, toggleSideNav, closeSideNav }) =>
         <div>
             <Navbar toggleSideNav={toggleSideNav} />
             <SideNav isActive={isSideNavActive} closeSideNav={closeSideNav} />
-            <div className="main-section">
-                <h1>Notification Center {userRole === 'ADMIN' ? '(Admin)' : '(Student)'}</h1>
-                {error && <p className="error">{error}</p>}
 
-                {userRole === 'ADMIN' && (
+            <div className="main-section">
+                <h1>Notification Center</h1>
+                <div className="notification-box">
+                    <div className="message-history">
+                        <h2>{userRole === "ROLE_ADMIN" ? "Sent Messages" : "Received Messages"}</h2>
+                        {notifications.length === 0 ? (
+                            <p>No messages yet.</p>
+                        ) : (
+                            <div className="message-list">
+                                {notifications.map((n, index) => (
+                                    <div
+                                        key={index}
+                                        className={`message-card ${n.isRead ? "read" : "unread"}`}
+                                    >
+                                        <h3>{n.title}</h3>
+                                        <p>{n.message}</p>
+                                        <p>
+                                            <strong>Time:</strong> {n.time}
+                                        </p>
+                                        <p>
+                                            <strong>Recipient:</strong> {n.recipient}
+                                        </p>
+                                        <p>
+                                            <strong>Type:</strong> {n.type}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
                     <div className="notification-container">
                         <form className="notification-form">
-                            <label>Subject:</label>
-                            <input type="text" value={subject} onChange={(e) => setSubject(e.target.value)} required />
+                            <label>Title:</label>
+                            <input
+                                type="text"
+                                value={title}
+                                onChange={(e) => setTitle(e.target.value)}
+                                required
+                            />
 
-                            <label>Content:</label>
-                            <textarea value={content} onChange={(e) => setContent(e.target.value)} rows="6" required />
+                            <label>Message:</label>
+                            <textarea
+                                value={message}
+                                onChange={(e) => setMessage(e.target.value)}
+                                rows="6"
+                                required
+                            />
 
-                            <label>Send to:</label>
-                            <select value={recipientType} onChange={(e) => setRecipientType(e.target.value)}>
-                                <option value="all_students">All Students</option>
-                                <option value="specific_course">Specific Course</option>
-                                <option value="specific_department">Specific Department</option>
-                                <option value="specific_person">Specific Person(s)</option>
+                            <label>Recipient:</label>
+                            <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                                <input
+                                    type="text"
+                                    placeholder="Enter username"
+                                    value={recipient}
+                                    onChange={(e) => setRecipient(e.target.value)}
+                                    disabled={sendToAll}
+                                />
+                                <label>
+                                    <input
+                                        type="checkbox"
+                                        checked={sendToAll}
+                                        onChange={(e) => {
+                                            setSendToAll(e.target.checked);
+                                            if (e.target.checked) setRecipient("ALL");
+                                            else setRecipient("");
+                                        }}
+                                    />{" "}
+                                    All Students
+                                </label>
+                            </div>
+
+                            <label>Type:</label>
+                            <select value={type} onChange={(e) => setType(e.target.value)}>
+                                <option value="INFO">INFO</option>
+                                <option value="ALERT">ALERT</option>
+                                <option value="REMINDER">REMINDER</option>
+                                <option value="SYSTEM">SYSTEM</option>
+                                <option value="MESSAGE">MESSAGE</option>
+                                <option value="UPDATE">UPDATE</option>
                             </select>
 
-                            {recipientType === 'specific_person' && (
-                                <>
-                                    <label>Emails (comma-separated):</label>
-                                    <input type="text" value={specificEmails} onChange={(e) => setSpecificEmails(e.target.value)} placeholder="example1@email.com, example2@email.com" required />
-                                </>
-                            )}
+                            <button type="button" onClick={handleSend} className="btn btn-primary">
+                                Send Notification
+                            </button>
 
-                            {recipientType === 'specific_course' && (
-                                <>
-                                    <label>Course Name/ID:</label>
-                                    <input type="text" value={specificCourse} onChange={(e) => setSpecificCourse(e.target.value)} required />
-                                </>
-                            )}
-
-                            {recipientType === 'specific_department' && (
-                                <>
-                                    <label>Department Name:</label>
-                                    <input type="text" value={specificDepartment} onChange={(e) => setSpecificDepartment(e.target.value)} required />
-                                </>
-                            )}
-
-                            <button type="button" onClick={handleSend} className="btn btn-primary">Send Notification</button>
+                            {error && <p className="error">{error}</p>}
                         </form>
                     </div>
-                )}
-
-                <div className="message-history">
-                    <h2>{userRole === 'ADMIN' ? 'Sent Messages' : 'Received Messages'}</h2>
-                    {notifications.length === 0 ? (
-                        <p>No messages {userRole === 'ADMIN' ? 'sent' : 'received'} yet.</p>
-                    ) : (
-                        <div className="message-list">
-                            {notifications.map((msg, index) => (
-                                <div key={index} className="message-card">
-                                    <h3>{msg.subject}</h3>
-                                    <p>{msg.content}</p>
-                                    <p><strong>Recipient:</strong> {msg.recipient}</p>
-                                    <p><strong>Sent:</strong> {msg.timestamp}</p>
-                                </div>
-                            ))}
-                        </div>
-                    )}
                 </div>
             </div>
         </div>
